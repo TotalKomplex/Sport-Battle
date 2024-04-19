@@ -25,13 +25,12 @@ public class Tournament : Service
         if (!success)
             return _response.Return("Unknown token!");
 
-        if (request._method == Method.POST)
-            return TournamentHistory(cmd,request);
-
         cmd.CommandText = "SELECT id FROM tournaments LIMIT 1";
         if (cmd.ExecuteScalar() == null)
             return _response.Return("No Tournament found!");
 
+        if (request._method == Method.POST)
+            return TournamentHistory(cmd, request);
 
         //tournament muss calculaten damit auch users updated werden
         var tournament = CalculateTournament(cmd);
@@ -48,8 +47,13 @@ public class Tournament : Service
     {
 
         var dict = JsonConvert.DeserializeObject<Dictionary<string, int>>(request.body);
+        cmd.CommandText = $"SELECT id, start_time FROM tournaments";
         if (dict["ID"]>0)
         {
+            cmd.Parameters.AddWithValue("id", dict["ID"]);
+            cmd.CommandText = "SELECT id FROM tournaments WHERE id = @id";
+            if (cmd.ExecuteScalar() == null)
+                return _response.Return("Tournament not found!");
             var tournament = CalculateTournament(cmd, dict["ID"]);
             return _response.Return($"The Tournament winner(s) is/are: [{String.Join(", ", tournament.leaders)}], with a lead of {tournament.record}");
         }
@@ -57,6 +61,7 @@ public class Tournament : Service
         cmd.CommandText = $"SELECT id, start_time FROM tournaments";
 
         using var reader = cmd.ExecuteReader();
+
         var tournaments = new List<Dictionary<string, object>>();
 
         while (reader.Read())
